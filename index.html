@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>УКЭП Подписание документов Битрикс24</title>
+    
+    <!-- Динамически подключаем родной скрипт Битрикса с текущего портала -->
+    <script src="/bitrix/js/rest/client/rest.js"></script>
+    
+    <!-- Локальные крипто-библиотеки из ZIP-архива приложения -->
+    <script src="cadesplugin_api.js"></script>
+    <script src="pdf-lib.min.js"></script>
+
+    <style>
+        body { font-family: Arial, sans-serif; background: #fff; padding: 20px; color: #333; }
+        .container { max-width: 500px; margin: 0 auto; border: 1px solid #eef2f4; padding: 25px; border-radius: 8px; background: #fafdff; box-shadow: 0 4px 12px rgba(0,0,0,0.03); }
+        .btn { background: #00bcd4; color: #fff; border: none; padding: 12px 24px; border-radius: 4px; font-weight: bold; cursor: pointer; width: 100%; font-size: 15px; transition: background 0.2s; }
+        .btn:hover { background: #00acc1; }
+        .btn:disabled { background: #cccccc; cursor: not-allowed; }
+        .btn.error-state { background: #f44336 !important; color: #fff !important; cursor: default; }
+        #status { margin-top: 15px; padding: 10px; border-radius: 4px; font-size: 13px; text-align: center; background: #f1f5f7; color: #666; line-height: 1.4; }
+        .info-box { font-size: 11px; color: #999; margin-top: 20px; border-top: 1px dashed #ddd; padding-top: 10px; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h3 style="margin-top: 0; color: #2067b0;">Автоматический штамп УКЭП</h3>
+    <p style="font-size: 13px; color: #555;">Система проверит документ, создаст новую страницу в конце файла и наложит синий штамп ЭЦП.</p>
+    
+    <button id="sign-btn" class="btn" disabled>Проверка подключения...</button>
+    <div id="status">Запуск локального фрейма...</div>
+    
+    <div class="info-box">
+        * Требуется установленный КриптоПро CSP и расширение для браузера. Подписание происходит локально на вашем устройстве.
+    </div>
+</div>
+
+<script>
+    let entityId = null;
+    let fileDownloadUrl = null;
+    let fileName = "document.pdf";
+    
+    const STAMP_WIDTH = 230;
+    const STAMP_HEIGHT = 70;
+
+    function showError(msg) {
+        const signBtn = document.getElementById('sign-btn');
+        const status = document.getElementById('status');
+        signBtn.innerText = "Ошибка инициализации";
+        signBtn.classList.add('error-state');
+        signBtn.disabled = true;
+        status.innerHTML = `<span style="color:red; font-weight:bold;">${msg}</span>`;
+    }
+
+    function startApplication() {
+        const status = document.getElementById('status');
+        const signBtn = document.getElementById('sign-btn');
+        
+        status.innerText = "Система успешно авторизована. Ожидание клика...";
+        signBtn.innerText = "Автоматический штамп УКЭП";
+        signBtn.disabled = false;
+
+        signBtn.addEventListener('click', async () => {
+            signBtn.disabled = true;
+            try {
+                if (!fileDownloadUrl) {
+                    throw new Error("Документ для подписания не найден в карточке.");
+                }
+
+                status.innerText = "Скачивание документа из Битрикс24...";
+                const fileResponse = await fetch(fileDownloadUrl);
+                const pdfBuffer = await fileResponse.arrayBuffer();
+
+                status.innerText = "Обращение к КриптоПро на вашем ПК...";
+                await cadesplugin;
+                const oStore = await cadesplugin.CreateObjectAsync("CAdESCOM.Store");
+                await oStore.Open(cadesplugin.CAPICOM_CURRENT_USER_STORE, cadesplugin.CAPICOM_MY_STORE, cadesplugin.CAPICOM_STORE_OPEN_READ_ONLY);
+                const oCertificates = await oStore.Certificates;
+                
+                if (await oCertificates.Count === 0) {
+                    throw new Error("Сертификаты УКЭП не найдены в вашей системе. Проверьте токен.");
+                }
+                
+                const oCertificate = await oCertificates.Item(1);
+                const subjectName = await oCertificate.SubjectName;
+                const serialNumber = await oCertificate.SerialNumber;
+                const validFrom = new Date(await oCertificate.ValidFromDate).toLocaleDateString('ru-RU');
+                const validTo = new Date(await oCertificate.ValidToDate).toLocaleDateString('ru-RU');
+                const cnMatch = subjectName.match(/CN=([^,]+)/);
+                const fio = cnMatch ? cnMatch : "Владелец сертификата";
+
+                status.innerText = "Чтение локального шрифта...";
+                const pdfDoc = await PDFLib.PDFDocument.load(pdfBuffer);
+                
+                const fontBytes = await fetch('PTSans-Regular.ttf').then(res => res.arrayBuffer());
+                const customFont = await pdfDoc.embedFont(fontBytes);
+
+                status.innerText = "Создание страницы для штампа...";
+                const targetPage = pdfDoc.addPage(); 
+                
+                const stampX = 595 - STAMP_WIDTH - 20; 
+                const stampY = 842 - STAMP_HEIGHT - 30; 
+
+                targetPage.drawRectangle({
+                    x: stampX, y: stampY,
+                    width: STAMP_WIDTH, height: STAMP_HEIGHT,
+                    borderColor: PDFLib.rgb(0.1, 0.27, 0.65),
+                    borderWidth: 1.5,
+                    color: PDFLib.rgb(0.95, 0.96, 0.98),
+                });
+
+                const textX = stampX + 10;
+                targetPage.drawText('ДОКУМЕНТ ПОДПИСАН ЭЦП', { x: textX, y: stampY + 54, size: 8, font: customFont, color: PDFLib.rgb(0.1, 0.27, 0.65) });
+                targetPage.drawText(`Владелец: ${fio}`, { x: textX, y: stampY + 40, size: 7, font: customFont, color: PDFLib.rgb(0, 0, 0) });
+                targetPage.drawText(`Серийный: ${serialNumber}`, { x: textX, y: stampY + 28, size: 7, font: customFont, color: PDFLib.rgb(0, 0, 0) });
+                targetPage.drawText(`Срок: ${validFrom} - ${validTo}`, { x: textX, y: stampY + 16, size: 7, font: customFont, color: PDFLib.rgb(0, 0, 0) });
+
+                const modifiedBytes = await pdfDoc.save();
+                
+                let binary = '';
+                const len = modifiedBytes.byteLength;
+                for (let i = 0; i 
+
+</body>
+</html>
