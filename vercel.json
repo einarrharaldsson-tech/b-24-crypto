@@ -1,0 +1,10 @@
+{
+  "cleanUrls": true,
+  "routes": [
+    {
+      "src": "/(.*)",
+      "methods": ["POST", "GET", "OPTIONS"],
+      "dest": "/index.html"
+    }
+  ]
+}
