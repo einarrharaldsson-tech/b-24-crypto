@@ -5,10 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>УКЭП Подписание документов Битрикс24</title>
     
-    <!-- Динамически подключаем родной скрипт Битрикса с текущего портала -->
-    <script src="/bitrix/js/rest/client/rest.js"></script>
+    <!-- ДЛЯ ОБЛАКА: Подключаем официальный загрузчик REST API -->
+    <script src="https://bitrix24.ru"></script>
     
-    <!-- Локальные крипто-библиотеки из ZIP-архива приложения -->
+    <!-- Локальные крипто-библиотеки из вашего репозитория -->
     <script src="cadesplugin_api.js"></script>
     <script src="pdf-lib.min.js"></script>
 
@@ -26,11 +26,11 @@
 <body>
 
 <div class="container">
-    <h3 style="margin-top: 0; color: #2067b0;">Автоматический штамп УКЭП</h3>
+    <h3 style="margin-top: 0; color: #2067b0;">Автоматический штамп УКЭП (Облако)</h3>
     <p style="font-size: 13px; color: #555;">Система проверит документ, создаст новую страницу в конце файла и наложит синий штамп ЭЦП.</p>
     
-    <button id="sign-btn" class="btn" disabled>Проверка подключения...</button>
-    <div id="status">Запуск локального фрейма...</div>
+    <button id="sign-btn" class="btn" disabled>Инициализация...</button>
+    <div id="status">Подключение к облаку Битрикс24...</div>
     
     <div class="info-box">
         * Требуется установленный КриптоПро CSP и расширение для браузера. Подписание происходит локально на вашем устройстве.
@@ -58,7 +58,7 @@
         const status = document.getElementById('status');
         const signBtn = document.getElementById('sign-btn');
         
-        status.innerText = "Система успешно авторизована. Ожидание клика...";
+        status.innerText = "Авторизация успешна. Ожидание клика...";
         signBtn.innerText = "Автоматический штамп УКЭП";
         signBtn.disabled = false;
 
