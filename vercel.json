@@ -1,4 +1,13 @@
 {
+  "cleanUrls": true,
+  "rewrites": [
+    {
+      "source": "/(.*)",
+      "destination": "/api"
+    }
+  ]
+}
+{
   "version": 2,
   "routes": [
     {
